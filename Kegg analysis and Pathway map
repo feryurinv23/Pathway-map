@@ -1,0 +1,52 @@
+# Install the necessary packages for pathway analysis (these lines are commented out for now)
+# BiocManager::install("pathview")  
+# BiocManager::install("org.Hs.eg.db") 
+# BiocManager::install("clusterProfiler") 
+# BiocManager::install("AnnotationDbi") 
+
+# Load the required libraries for the analysis
+library(clusterProfiler)    # For gene enrichment analysis
+library(org.Hs.eg.db)       # For mapping gene symbols to Entrez IDs
+library(pathview)           # For visualizing pathways
+library(AnnotationDbi)      
+
+# Read the gene data from an Excel file containing genes related to HIV (Paper 2)
+data_gaba <- openxlsx::read.xlsx("~/Documents/Analysis/Paper 2/all genes HIV paper2.xlsx")
+
+# Extract the gene symbols from the data
+data_gene <- data_gaba$gene
+
+# Map gene symbols to Entrez IDs using the org.Hs.eg.db database
+entrez_ids <- mapIds(org.Hs.eg.db, 
+                     keys = data_gene, 
+                     column = "ENTREZID", 
+                     keytype = "SYMBOL", 
+                     multiVals = function(x) paste(x, collapse = ";"))  
+# If multiple Entrez IDs are associated with a gene symbol, they are separated by a semicolon.
+
+# Create a data frame with the gene symbols and their corresponding Entrez IDs
+df_genes <- data.frame(GeneSymbol = data_gene, EntrezID = unname(entrez_ids), stringsAsFactors = FALSE)
+
+# Perform Overrepresentation Analysis (ORA) for KEGG pathways using Entrez IDs
+ora_kegg <- enrichKEGG(
+  gene = df_genes$EntrezID,    # Entrez IDs of differentially expressed genes
+  organism = "hsa",            # Organism (hsa = human, mmu = mouse)
+  pvalueCutoff = 0.05          # P-value cutoff for significance
+)
+
+# Visualize the top 10 significant KEGG pathways in a bar plot
+barplot(ora_kegg, showCategory = 10) # Show the top 10 pathways
+
+# Visualize the results of Gene Ontology (GO) enrichment analysis in a dot plot
+dotplot(ora_go, showCategory = 10) # Show the top 10 GO categories (note: 'ora_go' must be defined elsewhere in the script)
+
+# Save the KEGG pathway enrichment results as a CSV file
+kegg_results <- as.data.frame(ora_kegg)
+write.csv(kegg_results, "kegg_results.csv")
+
+# Visualize the most significant pathway using the 'pathview' package
+pathview(
+  gene.data = df_genes$EntrezID,   # Entrez IDs for the genes
+  pathway.id = c("04080"),         # KEGG pathway ID (in this case, "04080" represents a specific pathway)
+  species = "hsa"                  # Species (hsa = human)
+)
